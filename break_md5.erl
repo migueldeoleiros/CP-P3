@@ -96,16 +96,10 @@ break_md5(Hashes, N, Bound, Progress_Pid) ->
             break_md5(Hashes, N+1, Bound, Progress_Pid)
     end.
 
-%% Break a hash
+%% Break one hash
+break_md5(Hash) -> break_md5s([Hash]).
 
-break_md5(Hash) ->
-    Bound = pow(26, ?PASS_LEN),
-    Progress_Pid = spawn(?MODULE, progress_loop, [0, Bound]),
-    Num_Hash = hex_string_to_num(Hash),
-    Res = break_md5(Num_Hash, 0, Bound, Progress_Pid),
-    Progress_Pid ! stop,
-    Res.
-
+%% Breaks a list of hash
 break_md5s(Hashes) ->
     Bound = pow(26, ?PASS_LEN),
     Progress_Pid = spawn(?MODULE, progress_loop, [0, Bound]),
