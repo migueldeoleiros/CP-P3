@@ -7,7 +7,8 @@
          pass_to_num/1,
          num_to_pass/1,
          num_to_hex_string/1,
-         hex_string_to_num/1
+         hex_string_to_num/1,
+         break_md5s/1
         ]).
 
 -export([progress_loop/2]).
@@ -76,8 +77,9 @@ progress_loop(N, Bound) ->
 
 %% break_md5/2 iterates checking the possible passwords
 
-break_md5(Target_Hash, N, N, _) -> {not_found, Target_Hash};  % Checked every possible password
-break_md5(Target_Hash, N, Bound, Progress_Pid) ->
+break_md5([], _, _, _) -> ok; % Empty list of hashes (end of loop) 
+break_md5(Hashes, N, N, _) -> {not_found, Hashes};  % Checked every possible password
+break_md5(Hashes, N, Bound, Progress_Pid) ->
     if N rem ?UPDATE_BAR_GAP == 0 ->
             Progress_Pid ! {progress_report, ?UPDATE_BAR_GAP};
        true ->
@@ -86,11 +88,12 @@ break_md5(Target_Hash, N, Bound, Progress_Pid) ->
     Pass = num_to_pass(N),
     Hash = crypto:hash(md5, Pass),
     Num_Hash = binary:decode_unsigned(Hash),
-    if
-        Target_Hash == Num_Hash ->
-            io:format("\e[2K\r~.16B: ~s~n", [Num_Hash, Pass]);
+    case lists:member(Num_Hash, Hashes) of
         true ->
-            break_md5(Target_Hash, N+1, Bound, Progress_Pid)
+            io:format("\e[2K\r~.16B: ~s~n", [Num_Hash, Pass]),
+            break_md5(lists:delete(Num_Hash, Hashes), N+1, Bound, Progress_Pid);
+        false ->
+            break_md5(Hashes, N+1, Bound, Progress_Pid)
     end.
 
 %% Break a hash
@@ -100,5 +103,13 @@ break_md5(Hash) ->
     Progress_Pid = spawn(?MODULE, progress_loop, [0, Bound]),
     Num_Hash = hex_string_to_num(Hash),
     Res = break_md5(Num_Hash, 0, Bound, Progress_Pid),
+    Progress_Pid ! stop,
+    Res.
+
+break_md5s(Hashes) ->
+    Bound = pow(26, ?PASS_LEN),
+    Progress_Pid = spawn(?MODULE, progress_loop, [0, Bound]),
+    Num_Hashes = lists:map(fun hex_string_to_num/1, Hashes),
+    Res = break_md5(Num_Hashes, 0, Bound, Progress_Pid),
     Progress_Pid ! stop,
     Res.
