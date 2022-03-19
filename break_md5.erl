@@ -1,6 +1,6 @@
 -module(break_md5).
 -define(PASS_LEN, 6).
--define(UPDATE_BAR_GAP, 1000).
+-define(UPDATE_BAR_GAP, 100000).
 -define(BAR_SIZE, 40).
 
 -export([break_md5/1,
@@ -11,8 +11,7 @@
          break_md5s/1
         ]).
 
--export([progress_loop/3,
-         op_speed/1
+-export([progress_loop/3
         ]).
 
 % Base ^ Exp
@@ -62,22 +61,10 @@ num_to_hex_string_aux(N, Str) ->
 
 num_to_hex_string(0) -> "0";
 num_to_hex_string(N) -> num_to_hex_string_aux(N, []).
-
-%% Print speed
-
-op_speed(T) ->
-    receive
-        stop -> ok;
-        iter ->
-            T2 = erlang:monotonic_time(microsecond),
-            io:fwrite("\t ~.1f  op / second   ", [1000000/(T2-T)]),
-            op_speed(T2)
-    end.
-    
-
+   
 %% Progress bar runs in its own process
 
-progress_loop(N, Bound, Speed_Pid) ->
+progress_loop(N, Bound,T) ->
     receive
         stop -> ok;
         {progress_report, Checked} ->
@@ -85,10 +72,10 @@ progress_loop(N, Bound, Speed_Pid) ->
             Full_N = N2 * ?BAR_SIZE div Bound,
             Full = lists:duplicate(Full_N, $=),
             Empty = lists:duplicate(?BAR_SIZE - Full_N, $-),
-            io:format("\r[~s~s] ~.2f%", [Full, Empty, N2/Bound*100]),
-
-            Speed_Pid ! iter,
-            progress_loop(N2, Bound, Speed_Pid)
+            T2 = erlang:monotonic_time(microsecond),
+            T3 = T2-T,
+            io:format("\r[~s~s] ~.2f% \t [~.2f op/sec]", [Full, Empty, N2/Bound*100,(Checked/T3)*1000000]),
+            progress_loop(N2, Bound,T2)
     end.
 
 %% break_md5/2 iterates checking the possible passwords
@@ -118,10 +105,8 @@ break_md5(Hash) -> break_md5s([Hash]).
 %% Breaks a list of hash
 break_md5s(Hashes) ->
     Bound = pow(26, ?PASS_LEN),
-    Speed_Pid = spawn(?MODULE, op_speed, [0]),
-    Progress_Pid = spawn(?MODULE, progress_loop, [0, Bound, Speed_Pid]),
+    Progress_Pid = spawn(?MODULE, progress_loop, [0, Bound,0]),
     Num_Hashes = lists:map(fun hex_string_to_num/1, Hashes),
     Res = break_md5(Num_Hashes, 0, Bound, Progress_Pid),
     Progress_Pid ! stop,
-    Speed_Pid ! stop,
     Res.
