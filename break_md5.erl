@@ -69,8 +69,8 @@ op_speed(T) ->
     receive
         stop -> ok;
         iter ->
-            T2 = erlang:monotonic(microsecond),
-            io:format("~f", 1000/T2-T),
+            T2 = erlang:monotonic_time(microsecond),
+            io:fwrite("\t ~.1f  op / second   ", [1000000/(T2-T)]),
             op_speed(T2)
     end.
     
