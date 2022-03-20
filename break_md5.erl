@@ -14,7 +14,7 @@
 
 -export([progress_loop/3,
          break_md5/5,
-         start_procs/6
+         start_process/6
         ]).
 
 % Base ^ Exp
@@ -114,7 +114,7 @@ break_md5(Hashes, N, Bound, Progress_Pid, Start_Pid) ->
 
 
 %% creates process with break_md5
-start_procs(Hashes, 0, Bound, Progress_Pid, Break_List_Pid, Break_Ended) ->
+start_process(Hashes, 0, Bound, Progress_Pid, Break_List_Pid, Break_Ended) ->
     receive
         stop -> ok;
         {found,New_Hashes} ->
@@ -122,27 +122,27 @@ start_procs(Hashes, 0, Bound, Progress_Pid, Break_List_Pid, Break_Ended) ->
                                Pid ! {remove, New_Hashes} 
                        end,
             lists:foreach(Function,Break_List_Pid),
-            start_procs(Hashes, 0, Bound, Progress_Pid, Break_List_Pid, Break_Ended);
+            start_process(Hashes, 0, Bound, Progress_Pid, Break_List_Pid, Break_Ended);
         {not_found, Not_Found_Hashes} ->
             if Break_Ended == ?PROCESS ->
                 io:format("~n"),
                 {not_found, Not_Found_Hashes};
             true ->
-                start_procs(Hashes, 0, Bound, Progress_Pid, Break_List_Pid, Break_Ended+1)
+                start_process(Hashes, 0, Bound, Progress_Pid, Break_List_Pid, Break_Ended+1)
             end;
         ended ->
             if Break_Ended == ?PROCESS ->
                 ok;
             true ->
-                start_procs(Hashes, 0, Bound, Progress_Pid, Break_List_Pid, Break_Ended+1)
+                start_process(Hashes, 0, Bound, Progress_Pid, Break_List_Pid, Break_Ended+1)
             end
     end;
 
-start_procs(Hashes, N_Procs, Bound, Progress_Pid, Break_List_Pid, Break_Ended) ->
+start_process(Hashes, N_Procs, Bound, Progress_Pid, Break_List_Pid, Break_Ended) ->
     Start = Bound div ?PROCESS * (N_Procs-1),
     End   = Bound div ?PROCESS * N_Procs,
     Break_Pid = spawn(?MODULE, break_md5, [Hashes, Start, End, Progress_Pid, self()]),
-    start_procs(Hashes, N_Procs-1, Bound, Progress_Pid, [Break_Pid | Break_List_Pid], Break_Ended).
+    start_process(Hashes, N_Procs-1, Bound, Progress_Pid, [Break_Pid | Break_List_Pid], Break_Ended).
 
 
 %% Break one hash
@@ -153,6 +153,6 @@ break_md5s(Hashes) ->
     Bound = pow(26, ?PASS_LEN),
     Progress_Pid = spawn(?MODULE, progress_loop, [0, Bound, 0]),
     Num_Hashes = lists:map(fun hex_string_to_num/1, Hashes),
-    Res = start_procs(Num_Hashes, ?PROCESS, Bound, Progress_Pid, [], 1),
+    Res = start_process(Num_Hashes, ?PROCESS, Bound, Progress_Pid, [], 1),
     Progress_Pid ! stop,
     Res.
