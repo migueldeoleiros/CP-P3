@@ -13,7 +13,7 @@
         ]).
 
 -export([progress_loop/3,
-         break_md5/4,
+         break_md5/5,
          start_procs/5
         ]).
 
@@ -76,37 +76,58 @@ progress_loop(N, Bound,T) ->
             Empty = lists:duplicate(?BAR_SIZE - Full_N, $-),
             T2 = erlang:monotonic_time(microsecond),
             T3 = T2-T,
-            io:format("\r[~s~s] ~.2f% \t [~.2f op/sec]", [Full, Empty, N2/Bound*100,(Checked/T3)*1000000]),
+            io:format("\r[~s~s] ~.2f% \t [~.2f op/sec]   ", [Full, Empty, N2/Bound*100,(Checked/T3)*1000000]),
             progress_loop(N2, Bound,T2)
     end.
 
 
 %% break_md5/2 iterates checking the possible passwords
-break_md5([], _, _, _) -> ok; % Empty list of hashes (end of loop) 
-break_md5(Hashes, N, N, _) -> {not_found, Hashes};  % Checked every possible password
-break_md5(Hashes, N, Bound, Progress_Pid) ->
-    if N rem ?UPDATE_BAR_GAP == 0 ->
-            Progress_Pid ! {progress_report, ?UPDATE_BAR_GAP};
-       true ->
+break_md5([], _, _, _, Start_Pid) -> ok; % Empty list of hashes (end of loop) 
+break_md5(Hashes, N, N, _, Start_Pid) -> {not_found, Hashes};  % Checked every possible password
+break_md5(Hashes, N, Bound, Progress_Pid, Start_Pid) ->
+    receive 
+        {remove, New_Hashes} ->
+            break_md5(New_Hashes, N, Bound, Progress_Pid, Start_Pid);
+        stop -> 
             ok
-    end,
-    Pass = num_to_pass(N),
-    Hash = crypto:hash(md5, Pass),
-    Num_Hash = binary:decode_unsigned(Hash),
-    case lists:member(Num_Hash, Hashes) of
+    after 0 ->
+        if N rem ?UPDATE_BAR_GAP == 0 ->
+                Progress_Pid ! {progress_report, ?UPDATE_BAR_GAP};
         true ->
-            io:format("\e[2K\r~.16B: ~s~n", [Num_Hash, Pass]),
-            break_md5(lists:delete(Num_Hash, Hashes), N+1, Bound, Progress_Pid);
-        false ->
-            break_md5(Hashes, N+1, Bound, Progress_Pid)
+                ok
+        end,
+        Pass = num_to_pass(N),
+        Hash = crypto:hash(md5, Pass),
+        Num_Hash = binary:decode_unsigned(Hash),
+        case lists:member(Num_Hash, Hashes) of
+            true ->
+                io:format("\e[2K\r~.16B: ~s~n", [Num_Hash, Pass]),
+                Start_Pid ! {found, lists:delete(Num_Hash, Hashes)},
+                break_md5(lists:delete(Num_Hash, Hashes), N+1, Bound, Progress_Pid, Start_Pid);
+            false ->
+                break_md5(Hashes, N+1, Bound, Progress_Pid, Start_Pid)
+        end
     end.
 
 
 %% creates process with break_md5
+start_procs(Hashes, 0, Bound, Progress_Pid, Break_List_Pid) ->
+    receive
+        stop -> 
+            ok;
+        {found,New_Hashes} ->
+            Function = fun(Pid) -> 
+                               Pid ! {remove, New_Hashes} 
+                       end,
+            lists:foreach(Function,Break_List_Pid),
+            start_procs(Hashes, 0, Bound, Progress_Pid, Break_List_Pid)
+    end;
+        
+
 start_procs(Hashes, N_Procs, Bound, Progress_Pid, Break_List_Pid) ->
     Start = Bound div ?PROCESS * (N_Procs-1),
     End   = Bound div ?PROCESS * N_Procs,
-    Break_Pid = spawn(?MODULE, break_md5, [Hashes, Start, End, Progress_Pid]),
+    Break_Pid = spawn(?MODULE, break_md5, [Hashes, Start, End, Progress_Pid, self()]),
     start_procs(Hashes, N_Procs-1, Bound, Progress_Pid, [Break_Pid | Break_List_Pid]).
 
 
