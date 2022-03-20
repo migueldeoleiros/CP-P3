@@ -15,7 +15,6 @@
         ]).
 
 % Base ^ Exp
-
 pow_aux(_Base, Pow, 0) ->
     Pow;
 pow_aux(Base, Pow, Exp) when Exp rem 2 == 0 ->
@@ -25,8 +24,8 @@ pow_aux(Base, Pow, Exp) ->
 
 pow(Base, Exp) -> pow_aux(Base, 1, Exp).
 
-%% Number to password and back conversion
 
+%% Number to password and back conversion
 num_to_pass_aux(_N, 0, Pass) -> Pass;
 num_to_pass_aux(N, Digit, Pass) ->
     num_to_pass_aux(N div 26, Digit - 1, [$a + N rem 26 | Pass]).
@@ -36,8 +35,8 @@ num_to_pass(N) -> num_to_pass_aux(N, ?PASS_LEN, []).
 pass_to_num(Pass) ->
     lists:foldl(fun (C, Num) -> Num * 26 + C - $a end, 0, Pass).
 
-%% Hex string to Number
 
+%% Hex string to Number
 hex_char_to_int(N) ->
     if (N >= $0) and (N =< $9) -> N - $0;
        (N >= $a) and (N =< $f) -> N - $a + 10;
@@ -62,8 +61,8 @@ num_to_hex_string_aux(N, Str) ->
 num_to_hex_string(0) -> "0";
 num_to_hex_string(N) -> num_to_hex_string_aux(N, []).
    
-%% Progress bar runs in its own process
 
+%% Progress bar runs in its own process
 progress_loop(N, Bound,T) ->
     receive
         stop -> ok;
@@ -78,8 +77,8 @@ progress_loop(N, Bound,T) ->
             progress_loop(N2, Bound,T2)
     end.
 
-%% break_md5/2 iterates checking the possible passwords
 
+%% break_md5/2 iterates checking the possible passwords
 break_md5([], _, _, _) -> ok; % Empty list of hashes (end of loop) 
 break_md5(Hashes, N, N, _) -> {not_found, Hashes};  % Checked every possible password
 break_md5(Hashes, N, Bound, Progress_Pid) ->
@@ -98,6 +97,7 @@ break_md5(Hashes, N, Bound, Progress_Pid) ->
         false ->
             break_md5(Hashes, N+1, Bound, Progress_Pid)
     end.
+
 
 %% Break one hash
 break_md5(Hash) -> break_md5s([Hash]).
