@@ -2,7 +2,7 @@
 -define(PASS_LEN, 6).
 -define(UPDATE_BAR_GAP, 100000).
 -define(BAR_SIZE, 40).
--define(PROCESS, 5).
+-define(PROCESS, 8).
 
 -export([break_md5/1,
          pass_to_num/1,
