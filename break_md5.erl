@@ -2,6 +2,7 @@
 -define(PASS_LEN, 6).
 -define(UPDATE_BAR_GAP, 100000).
 -define(BAR_SIZE, 40).
+-define(PROCESS, 5).
 
 -export([break_md5/1,
          pass_to_num/1,
@@ -11,7 +12,9 @@
          break_md5s/1
         ]).
 
--export([progress_loop/3
+-export([progress_loop/3,
+         break_md5/4,
+         start_procs/5
         ]).
 
 % Base ^ Exp
@@ -99,6 +102,14 @@ break_md5(Hashes, N, Bound, Progress_Pid) ->
     end.
 
 
+%% creates process with break_md5
+start_procs(Hashes, N_Procs, Bound, Progress_Pid, Break_List_Pid) ->
+    Start = Bound div ?PROCESS * (N_Procs-1),
+    End   = Bound div ?PROCESS * N_Procs,
+    Break_Pid = spawn(?MODULE, break_md5, [Hashes, Start, End, Progress_Pid]),
+    start_procs(Hashes, N_Procs-1, Bound, Progress_Pid, [Break_Pid | Break_List_Pid]).
+
+
 %% Break one hash
 break_md5(Hash) -> break_md5s([Hash]).
 
@@ -107,6 +118,6 @@ break_md5s(Hashes) ->
     Bound = pow(26, ?PASS_LEN),
     Progress_Pid = spawn(?MODULE, progress_loop, [0, Bound,0]),
     Num_Hashes = lists:map(fun hex_string_to_num/1, Hashes),
-    Res = break_md5(Num_Hashes, 0, Bound, Progress_Pid),
+    Res = start_procs(Num_Hashes, ?PROCESS, Bound, Progress_Pid, []),
     Progress_Pid ! stop,
     Res.
