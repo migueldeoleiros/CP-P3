@@ -1,0 +1,51 @@
+* P3 MD5 erlang
+En esta práctica reimplementamos el cálculo de hashes md5 de la [[https://github.com/migueldeoleiros/CP-P2][P2]] usando paso de mensajes en erlang.
+
+El código proporcionado hace el cálculo usando un único proceso.
+#+begin_src erlang
+  1> break_md5:break_md5("76a2173be6393254e72ffa4d6df1030a").
+
+  76A2173BE6393254E72FFA4D6DF1030A: passwd
+  ok
+#+end_src
+
+La barra de progreso corre en su propio proceso, y se imprime cada vez que recibe un mensaje con los casos probados desde la última comunicación .
+
+** [[https://github.com/migueldeoleiros/CP-P3/tree/ejercicio1][Ejercicio 1]]
+*Comprobación de múltiples hashes*
+
+Implementar una función /break_md5s/1/, que dada una lista de hashes, obtenga los passwords correspondientes. Un ejemplo de ejecución sería:
+#+begin_src erlang
+  1> break_md5:break_md5s(["76a2173be6393254e72ffa4d6df1030a",
+  "e80b5017098950fc58aad83c8c14978e"]).
+
+  E80B5017098950FC58AAD83C8C14978E: abcdef
+  76A2173BE6393254E72FFA4D6DF1030A: passwd
+#+end_src
+
+Para este ejercicio solo hacía falta modificar la función /break_md5/1/  para que reciba como argumento una lista, y luego usando la función /lists:map/ ejecutar /hex_string_to_num/1/ en cada hash de la lista.
+A mayores cambiamos la función /break_md5/1/  para que ahora sea en función de /break_md5s/1/ reduciendo el código duplicado. 
+
+** [[https://github.com/migueldeoleiros/CP-P3/tree/ejercicio2][Ejercicio 2]]
+*Estimación del número de passwords comprobados por segundo*
+
+Añadir a la barra de progreso una estimación del número de passwords comprobados por segundo.
+Para medir tiempos se puede utilizar la función /erlang:monotonic_time(microseconds)/. Esta función devuelve un valor que crece monótonamente entre llamadas a la función con los microsegundos que han pasado entre esas llamadas (es decir, no está afectado por cambios en la hora del sistema). Por ejemplo:
+#+begin_src erlang
+T1 = erlang:monotonic_time(microseconds),
+...
+T2 = erlang:monotonic_time(microseconds),
+T2 - T1.
+#+end_src
+Calcularía el tiempo pasado entre las dos llamadas.
+
+Añadimos un parámetro más a la función /progress_loop/2/, en lugar de calcular el número de iteraciones en un tiempo como en la anterior práctica, esta vez calculamos el tiempo que pasa entre cada iteración, aprovechando la función recursiva para pasar la última medición de tiempo.
+
+** [[https://github.com/migueldeoleiros/CP-P3/tree/ejercicio3][Ejercicio 3]]
+*Programa multiproceso*
+
+Al igual que en la práctica anterior, modifica la implementación para que el cálculo de los hashes se haga en múltiples procesos.
+Cuando se encuentre el password para un hash, hay que avisar al resto de procesos para que no lo continúen comprobando. El programa debería parar cuando se hayan encontrado todos los passwords, es decir, no debería quedar en ejecución ninguno de los procesos creados.
+
+Para esto creamos una función recursiva /start_process/6/ que primero creará los procesos y luego pasará a recibir mensajes.
+También modificamos la función /break_md5/5/ que ahora tendrá que actualizar su lista de hashes según los que encontrara otro proceso, de esta forma, cuando encuentra una clave, imprime el resultado y envía un mensaje a la función /start_process/6/ que distribuirá la nueva lista a todos los procesos.
